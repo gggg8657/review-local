@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>논문 사전 리뷰</title>
+<style>
+  :root{--bg:#f6f7f9;--fg:#1d1f23;--muted:#6b7280;--line:#dde1e6;--card:#fff;--acc:#2563eb;--acc2:#e8efff;
+    --maj:#b42318;--majb:#fde8e7;--min:#8a5a00;--minb:#fff4d6;--inf:#475467;--infb:#eef0f3;--ok:#166534;--okb:#dcfce7;--mark:#ffe58a}
+  *{box-sizing:border-box}
+  body{font:14.5px/1.6 -apple-system,"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;background:var(--bg);color:var(--fg);margin:0}
+  .wrap{max-width:1360px;margin:0 auto;padding:18px 16px}
+  header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  h1{font-size:20px;margin:0}h1 small{font-weight:400;color:var(--muted);font-size:13px;margin-left:6px}
+  .priv{font-size:12px;color:#166534;background:#ecfdf3;border:1px solid #c6f0d5;border-radius:99px;padding:2px 10px}
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:12px 0 14px}
+  .tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;background:none;padding:8px 14px;cursor:pointer;color:var(--muted);font:inherit;font-weight:600}
+  .tabs button.on{color:var(--fg);border-bottom-color:var(--acc)}
+  [hidden]{display:none!important}
+  .cols{display:grid;grid-template-columns:minmax(320px,400px) minmax(0,1fr);gap:16px;align-items:start}
+  @media (max-width:960px){.cols{grid-template-columns:minmax(0,1fr)}}
+  .cols>*,.facts>*{min-width:0}
+  select{max-width:100%}
+  #out,.facts,.outline,.hist,#steps,#vtext,#vtitle{overflow-wrap:anywhere}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+  .panel h3{margin:0 0 8px;font-size:14px}
+  label{display:flex;flex-direction:column;gap:3px;font-size:12.5px;color:var(--muted);margin-bottom:10px}
+  input,select,textarea,button{font:inherit;font-size:14px;padding:6px 9px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--fg)}
+  button{cursor:pointer}button:hover{border-color:#b8c0cc}button:disabled{opacity:.5;cursor:default}
+  button.primary{background:var(--acc);color:#fff;border-color:var(--acc);font-weight:600;padding:8px 18px}
+  button.sm{font-size:12.5px;padding:3px 9px}
+  .seg{display:flex;flex-wrap:wrap;gap:4px}.seg button{font-size:13px;padding:4px 10px;border-radius:99px}
+  .seg button.on{background:var(--acc2);border-color:var(--acc);color:var(--acc);font-weight:600}
+  .drop{border:2px dashed #c3cad5;border-radius:10px;padding:22px 12px;text-align:center;color:var(--muted);cursor:pointer;background:#fafbfc}
+  .drop.over{border-color:var(--acc);background:var(--acc2)}
+  .drop b{color:var(--fg)}
+  .hint{font-size:12px;color:var(--muted)}
+  .bar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:10px 0}
+  #status{color:var(--muted);font-size:13px}
+  .steps{font-size:13px;margin:6px 0}.steps div{padding:1px 0;color:var(--muted)}.steps div.cur{color:var(--fg);font-weight:600}
+  .steps div.done::before{content:"✓ ";color:var(--ok)}.steps div.cur::before{content:"▸ ";color:var(--acc)}
+  details.raw summary{cursor:pointer;font-size:12.5px;color:var(--muted)}
+  pre.stream{white-space:pre-wrap;font:12.5px/1.5 ui-monospace,Menlo,Consolas,monospace;background:#fafbfc;border:1px dashed var(--line);border-radius:8px;padding:10px;max-height:260px;overflow:auto;margin:6px 0 0;color:#374151}
+  .outline{font-size:13px;max-height:320px;overflow:auto}.outline div{display:flex;gap:6px;padding:2px 4px;border-radius:5px;cursor:pointer}
+  .outline div:hover{background:var(--acc2)}.outline .k{font-size:11px;color:var(--muted);min-width:46px}.outline .pg{margin-left:auto;color:var(--muted);font-size:11.5px}
+  .facts{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:13px}.facts span:nth-child(odd){color:var(--muted)}
+  .empty{color:var(--muted);text-align:center;padding:60px 10px}
+  .verdict{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .vbadge{font-size:17px;font-weight:700;border-radius:8px;padding:4px 14px}
+  .v-Accept{background:var(--okb);color:var(--ok)}.v-Minor{background:var(--minb);color:var(--min)}.v-Major{background:var(--majb);color:var(--maj)}.v-Reject{background:#2b2b2b;color:#fff}.v-none{background:var(--infb);color:var(--inf)}
+  .contrib{margin:6px 0 0;padding-left:20px}.reasons{margin:8px 0 0;padding-left:18px}
+  .ref{color:var(--acc);cursor:pointer;font-weight:600;font-size:12.5px;white-space:nowrap}.ref:hover{text-decoration:underline}
+  .filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:3}
+  .chip{font-size:12.5px;padding:3px 10px;border-radius:99px;cursor:pointer;user-select:none;border:1px solid var(--line);background:#fff}
+  .chip.off{opacity:.45;text-decoration:line-through}
+  .chip.major{color:var(--maj);border-color:#f3b7b2}.chip.minor{color:var(--min);border-color:#ecd28a}.chip.info{color:var(--inf)}
+  .issue{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:9px;padding:10px 14px;margin-bottom:9px}
+  .issue.major{border-left-color:var(--maj)}.issue.minor{border-left-color:#e0b44a}.issue.info{border-left-color:#b8c0cc}
+  .issue.done{opacity:.5}
+  .issue .hd{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+  .issue .id{font-weight:700;font-size:12.5px;color:var(--muted)}
+  .issue .tt{font-weight:600;flex:1;min-width:min(200px,100%)}
+  .sev{font-size:11.5px;font-weight:700;border-radius:5px;padding:0 7px}
+  .sev.major{background:var(--majb);color:var(--maj)}.sev.minor{background:var(--minb);color:var(--min)}.sev.info{background:var(--infb);color:var(--inf)}
+  .tag{font-size:11.5px;border-radius:5px;padding:0 7px;background:#eef0f3;color:#374151}
+  .tag.rule{background:#e8f1fb;color:#1e4f8a}
+  .loc{font-size:12.5px;color:var(--acc);cursor:pointer}.loc:hover{text-decoration:underline}
+  blockquote{margin:7px 0;padding:4px 10px;border-left:3px solid #c9ced6;background:#fafbfc;color:#374151;font-size:13.5px;cursor:pointer;border-radius:0 6px 6px 0}
+  blockquote:hover{background:var(--acc2)}
+  .issue p{margin:4px 0;font-size:14px}.issue p b{font-size:12.5px;color:var(--muted);margin-right:4px}
+  .issue .ck{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:4px;margin:0;flex-direction:row;cursor:pointer}
+  .qa li{margin:0 0 10px}.qa .tip{color:#374151;font-size:13.5px;margin-top:2px}.qa .tip b{color:var(--muted);font-size:12.5px}
+  h2.sec{font-size:15px;margin:18px 0 8px;display:flex;gap:8px;align-items:center}
+  .dl{display:flex;gap:6px;flex-wrap:wrap}
+  .hist li{list-style:none;display:flex;gap:10px;align-items:center;padding:8px 4px;border-bottom:1px solid #eef0f3;flex-wrap:wrap}
+  .hist ul{padding:0;margin:0}.hist li .t{flex:1;cursor:pointer;min-width:min(220px,100%)}.hist li .t:hover{color:var(--acc)}
+  .hist .ts{font-size:12px;color:var(--muted);min-width:130px}
+  /* 원문 보기 */
+  #viewer{position:fixed;top:0;right:0;bottom:0;width:min(760px,100vw);background:#fff;border-left:1px solid var(--line);box-shadow:-8px 0 24px rgba(0,0,0,.08);
+    transform:translateX(105%);visibility:hidden;transition:transform .18s,visibility 0s .18s;z-index:20;display:flex;flex-direction:column}
+  #viewer.on{transform:none;visibility:visible;transition:transform .18s}
+  #viewer .vh{display:flex;gap:8px;align-items:center;padding:10px 56px 10px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  #viewer .vh b{flex:1;min-width:min(160px,100%);font-size:14px}
+  #vtext{flex:1;overflow:auto;padding:14px 18px;white-space:pre-wrap;font:13.5px/1.75 -apple-system,"Pretendard","Malgun Gothic",system-ui,sans-serif;color:#2b2f36}
+  mark{background:var(--mark);border-radius:3px;padding:1px 0}mark.cur{outline:2px solid #e0a800}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1f2937;color:#fff;padding:7px 16px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:30}
+  .toast.on{opacity:.95}
+  .warn{background:var(--minb);color:var(--min);border-radius:7px;padding:6px 10px;font-size:13px;margin:6px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>논문 사전 리뷰 <small>투고 전 원고를 심사위원 눈으로</small></h1>
+  <span class="priv" title="원고는 이 서버에서 텍스트로 추출해 이 서버의 로컬 LLM 으로만 분석합니다. 외부 API·인터넷으로 보내지 않습니다. 원본 파일은 추출 직후 지우고, 추출 텍스트와 리뷰는 이 서버의 도구 데이터 폴더(이력)에 남습니다.">🔒 원고는 외부로 나가지 않음 · 로컬 LLM</span>
+  <span class="hint" id="modelinfo"></span>
+</header>
+<div class="tabs" id="tabs">
+  <button data-tab="review" class="on">리뷰</button>
+  <button data-tab="history">이력</button>
+</div>
+
+<section id="tab-review">
+<div class="cols">
+  <div>
+    <div class="panel">
+      <h3>1. 원고</h3>
+      <div class="drop" id="drop"><b>원고 파일을 끌어 놓거나 클릭</b><br><span class="hint">PDF · DOCX · HWP/HWPX · TXT (최대 60MB) — 올리면 바로 구조 인식·기계적 점검</span></div>
+      <input type="file" id="file" accept=".pdf,.docx,.hwp,.hwpx,.txt,.md,.tex" hidden>
+      <div id="docinfo"></div>
+    </div>
+    <div class="panel">
+      <h3>2. 리뷰 설정</h3>
+      <label>대상 저널·분야 (선택)<input id="journal" placeholder="예: Nuclear Engineering and Technology / 원자력 안전 · 머신러닝"></label>
+      <label>원고 유형<div class="seg" id="mtype"></div></label>
+      <label>리뷰 깊이<div class="seg" id="depth"></div><span class="hint" id="depthhint"></span></label>
+      <label>리뷰 언어<div class="seg" id="lang"></div></label>
+      <label>모델<select id="model"></select></label>
+      <div class="bar"><button class="primary" id="go" disabled>LLM 리뷰 시작</button><span id="status"></span></div>
+      <div class="steps" id="steps"></div>
+      <details class="raw" id="rawbox" hidden><summary>모델 출력 보기 (진행 중)</summary><pre class="stream" id="stream"></pre></details>
+    </div>
+    <div class="panel" id="outlinebox" hidden>
+      <h3>원고 구조 <span class="hint">— 클릭하면 원문</span></h3>
+      <div class="outline" id="outline"></div>
+    </div>
+  </div>
+  <div id="out"><div class="panel empty">원고를 올리면 기계적 점검 결과가 먼저 나오고,<br><b>LLM 리뷰 시작</b>을 누르면 요약·예상 판정·주요/세부 지적·예상 질문이 이어서 채워집니다.<br><br>
+    <span class="hint">모든 지적은 원고 문장을 인용하고, 그 인용이 원고에 실제로 있는지 프로그램이 확인합니다(못 찾으면 버림).</span></div></div>
+</div>
+</section>
+
+<section id="tab-history" hidden>
+  <div class="panel hist"><h3>리뷰 이력 <span class="hint">— 이 서버의 도구 데이터 폴더에 저장</span></h3><ul id="hist"></ul></div>
+</section>
+</div>
+
+<aside id="viewer">
+  <div class="vh"><b id="vtitle">원문</b>
+    <button class="sm" id="vprev">◀ 이전 쪽</button><button class="sm" id="vnext">다음 쪽 ▶</button><button class="sm" id="vclose">닫기 ✕</button></div>
+  <div id="vtext"></div>
+</aside>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const toast = m => { const t = $('toast'); t.textContent = m; t.classList.add('on'); setTimeout(() => t.classList.remove('on'), 1800); };
+const SEV = {major: '주요', minor: '세부', info: '참고'};
+const KEY = 'review-local.opts';
+let META = {}, REC = null, busy = false;
+let F = {sev: {major: true, minor: true, info: true}, src: {llm: true, rule: true}, cat: '', q: '', hideDone: false};
+let opts = Object.assign({mtype: '연구논문', depth: 'quick', lang: 'auto', journal: ''}, (() => { try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { return {}; } })());
+const saveOpts = () => { try { localStorage.setItem(KEY, JSON.stringify(opts)); } catch (e) {} };
+const doneKey = id => 'review-local.done.' + id;
+const getDone = () => { try { return new Set(JSON.parse(localStorage.getItem(doneKey(REC.id)) || '[]')); } catch (e) { return new Set(); } };
+const setDone = s => { try { localStorage.setItem(doneKey(REC.id), JSON.stringify([...s])); } catch (e) {} };
+
+// ── 탭 ──
+$('tabs').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  [...$('tabs').children].forEach(x => x.classList.toggle('on', x === b));
+  $('tab-review').hidden = b.dataset.tab !== 'review'; $('tab-history').hidden = b.dataset.tab !== 'history';
+  if (b.dataset.tab === 'history') loadHist();
+};
+
+function seg(id, items, key, after) {
+  const el = $(id); el.innerHTML = items.map(x => `<button data-v="${esc(x.id)}" class="${opts[key] === x.id ? 'on' : ''}">${esc(x.label)}</button>`).join('');
+  el.onclick = e => { const b = e.target.closest('button'); if (!b) return; opts[key] = b.dataset.v; saveOpts(); [...el.children].forEach(x => x.classList.toggle('on', x === b)); after && after(); };
+}
+function depthHint() {
+  $('depthhint').textContent = opts.depth === 'deep' ? '절마다 ~8천 자씩 나눠 꼼꼼히 — 20쪽 원고 기준 10~20분' : '큰 덩어리로 핵심만 — 20쪽 원고 기준 3~6분';
+}
+
+async function init() {
+  META = await (await fetch('api/meta')).json();
+  seg('mtype', META.mtypes.map(x => ({id: x, label: x})), 'mtype');
+  seg('depth', META.depths, 'depth', depthHint); depthHint();
+  seg('lang', META.langs, 'lang');
+  $('journal').value = opts.journal || '';
+  $('journal').oninput = () => { opts.journal = $('journal').value; saveOpts(); };
+  $('modelinfo').textContent = `${META.model} · ${META.llm}` + (META.tools.pdftotext ? '' : ' · ⚠ pdftotext 없음') + (META.tools.kordoc ? '' : ' · HWP 미지원(kordoc 없음)');
+  const ms = await (await fetch('api/models')).json().catch(() => []);
+  const all = [...new Set([META.model, ...ms])];
+  $('model').innerHTML = all.map(m => `<option ${m === META.model ? 'selected' : ''}>${esc(m)}</option>`).join('');
+  const id = location.hash.slice(1); if (/^\d{8}-\d{6}-[0-9a-f]{4}$/.test(id)) openRec(id);
+}
+
+// ── 업로드 ──
+const drop = $('drop');
+drop.onclick = () => $('file').click();
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer.files[0]) upload(e.dataTransfer.files[0]); };
+$('file').onchange = () => { if ($('file').files[0]) upload($('file').files[0]); $('file').value = ''; };
+
+async function upload(f) {
+  if (busy) return toast('리뷰 진행 중입니다');
+  if (f.size > 60 * 1024 * 1024) return toast('60MB 이하만 올릴 수 있습니다');
+  $('docinfo').innerHTML = `<div class="hint" style="margin-top:8px">${esc(f.name)} 읽는 중…</div>`;
+  const b64 = await new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result.split(',')[1]); r.onerror = no; r.readAsDataURL(f); });
+  try {
+    const r = await fetch('api/upload', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name: f.name, data: b64, mtype: opts.mtype})});
+    const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+    setRec(j);
+  } catch (e) { $('docinfo').innerHTML = `<div class="warn">⚠ ${esc(e.message)}</div>`; }
+}
+
+function setRec(rec) {
+  REC = rec; location.hash = rec.id; $('go').disabled = false;
+  const d = rec.doc, sev = s => rec.issues.filter(i => i.src === 'rule' && i.sev === s).length;
+  $('docinfo').innerHTML = `<div class="facts" style="margin-top:10px">
+    <span>파일</span><span>${esc(d.name)}</span><span>제목</span><span>${esc(d.title || '(못 찾음)')}</span>
+    <span>분량</span><span>${d.npages > 1 ? d.npages + '쪽 · ' : ''}${d.text.length.toLocaleString()}자 · ${d.lang === 'ko' ? '국문' : '영문'} · 추출 ${esc(d.via)}</span>
+    <span>인식</span><span>절 ${d.outline.filter(s => s.kind !== 'front').length} · 그림 ${d.captions.filter(c => c.type === 'fig').length} · 표 ${d.captions.filter(c => c.type === 'tab').length} · 참고문헌 ${d.nrefs}${d.ref_style ? ` (${d.ref_style === 'numeric' ? '번호식' : '저자-연도'})` : ''}</span>
+    <span>규칙 점검</span><span>세부 ${sev('minor') + sev('major')} · 참고 ${sev('info')}</span></div>`;
+  $('outlinebox').hidden = false;
+  $('outline').innerHTML = d.outline.map(s => `<div data-pos="${s.start}" style="padding-left:${4 + Math.max(0, s.level - 1) * 12}px"><span class="k">${esc(s.label)}</span><span>${esc(s.title)}</span><span class="pg">${s.page ? 'p.' + s.page : ''}</span></div>`).join('');
+  if (rec.options) {
+    for (const k of ['mtype', 'depth', 'lang']) if (rec.options[k]) { opts[k] = rec.options[k]; }
+    if (rec.options.journal != null) { opts.journal = rec.options.journal; $('journal').value = opts.journal; }
+    seg('mtype', META.mtypes.map(x => ({id: x, label: x})), 'mtype'); seg('depth', META.depths, 'depth', depthHint); seg('lang', META.langs, 'lang'); depthHint();
+  }
+  F.cat = ''; render();
+}
+$('outline').onclick = e => { const r = e.target.closest('[data-pos]'); if (r) view(+r.dataset.pos, 0); };
+
+// ── 리뷰 실행 (SSE) ──
+$('go').onclick = async () => {
+  if (!REC || busy) return;
+  busy = true; $('go').disabled = true;
+  const t0 = Date.now(), steps = [];
+  const timer = setInterval(() => { $('status').textContent = `${((Date.now() - t0) / 1000).toFixed(0)}초`; }, 1000);
+  $('steps').innerHTML = ''; $('stream').textContent = ''; $('rawbox').hidden = false;
+  const draw = () => { $('steps').innerHTML = steps.map((s, i) => `<div class="${i === steps.length - 1 ? 'cur' : 'done'}">${esc(s)}</div>`).join(''); };
+  try {
+    const r = await fetch('api/run', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({id: REC.id, journal: opts.journal || '', mtype: opts.mtype, depth: opts.depth, lang: opts.lang, model: $('model').value})});
+    const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '', done = null;
+    for (;;) {
+      const {value, done: end} = await rd.read(); if (end) break;
+      buf += dec.decode(value, {stream: true});
+      let i; while ((i = buf.indexOf('\n\n')) >= 0) {
+        const line = buf.slice(0, i); buf = buf.slice(i + 2);
+        if (!line.startsWith('data: ')) continue;
+        const ev = JSON.parse(line.slice(6));
+        if (ev.token) { const s = $('stream'); s.textContent += ev.token; s.scrollTop = s.scrollHeight; }
+        if (ev.stage) {
+          if (ev.reset) $('stream').textContent = '';
+          if (ev.stage === 'chunk_done') steps[steps.length - 1] += ' — ' + ev.msg.replace(/^발췌 \d+: /, ''); else steps.push(ev.msg);
+          draw();
+        }
+        if (ev.error) throw new Error(ev.error);
+        if (ev.done) done = ev.done;
+      }
+    }
+    if (!done) throw new Error('응답이 끊겼습니다');
+    steps.push(`완료 · ${done.review.elapsed}초`); draw(); $('steps').lastChild.className = 'done';
+    $('rawbox').hidden = true; setRec(done); toast('리뷰 완료');
+  } catch (e) {
+    $('steps').insertAdjacentHTML('beforeend', `<div class="warn">⚠ ${esc(e.message)}</div>`);
+  } finally { clearInterval(timer); $('status').textContent = ''; busy = false; $('go').disabled = false; }
+};
+
+// ── 결과 ──
+function vclass(l) { return l ? 'v-' + l.split(' ')[0] : 'v-none'; }
+function refLinks(refs) { return (refs || []).map(r => `<span class="ref" data-ref="${esc(r)}">#${esc(r)}</span>`).join(' '); }
+function stripRefs(t) { return esc(t).replace(/\s*\(?\s*#[Mm]\d+(?:\s*,\s*#[Mm]\d+)*\s*\)?/g, ''); }
+
+function render() {
+  if (!REC) return;
+  const rv = REC.review, iss = REC.issues, done = getDone();
+  const cats = [...new Set(iss.map(i => i.cat))];
+  const cnt = (k, v) => iss.filter(i => i[k] === v).length;
+  let h = '';
+  if (rv) {
+    const v = rv.verdict || {};
+    h += `<div class="panel"><div class="verdict"><span class="vbadge ${vclass(v.label)}">${esc(v.label || '판정 없음')}</span>
+      <span class="hint">예상 판정 · ${esc(rv.model)} · ${esc(rv.depth)} · 발췌 ${rv.chunks.length}개${rv.coverage != null && rv.coverage < 95 ? ` (본문의 ${rv.coverage}%)` : ''} · ${rv.elapsed}초 · ${esc(rv.ts)}</span></div>
+      <ul class="reasons">${(v.reasons || []).map(r => `<li>${stripRefs(r.text)} ${refLinks(r.refs)}</li>`).join('') || '<li class="hint">이유를 받지 못했습니다</li>'}</ul>
+      <h2 class="sec">원고가 주장하는 기여</h2><ol class="contrib">${(rv.summary.contrib || []).map(c => `<li>${esc(c)}</li>`).join('')}</ol>
+      ${rv.dropped && rv.dropped.length ? `<p class="hint" style="margin:8px 0 0">원고에서 인용을 찾지 못했거나 일반론이라 버린 지적 ${rv.dropped.length}개 <span class="ref" id="showdrop">보기</span></p><div id="dropbox" hidden>${rv.dropped.map(d => `<div class="hint">· [${esc(d.reason)}] ${esc(d.why)} <i>“${esc(d.quote)}”</i></div>`).join('')}</div>` : ''}
+    </div>`;
+  } else {
+    h += `<div class="panel"><div class="verdict"><span class="vbadge v-none">기계적 점검만</span><span class="hint">LLM 리뷰를 시작하면 요약·판정·주요/세부 지적·예상 질문이 추가됩니다</span></div></div>`;
+  }
+  h += `<div class="filters">
+    ${['major', 'minor', 'info'].map(s => `<span class="chip ${s} ${F.sev[s] ? '' : 'off'}" data-f="sev" data-v="${s}">${SEV[s]} ${cnt('sev', s)}</span>`).join('')}
+    <span class="chip ${F.src.llm ? '' : 'off'}" data-f="src" data-v="llm">LLM 심사 ${cnt('src', 'llm')}</span>
+    <span class="chip ${F.src.rule ? '' : 'off'}" data-f="src" data-v="rule">기계 점검 ${cnt('src', 'rule')}</span>
+    <select id="fcat" style="font-size:12.5px;padding:2px 6px"><option value="">분류 전체</option>${cats.map(c => `<option ${F.cat === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
+    <input id="fq" placeholder="검색" value="${esc(F.q)}" style="font-size:12.5px;padding:2px 8px;width:120px">
+    <label class="ck" style="flex-direction:row;margin:0"><input type="checkbox" id="fdone" ${F.hideDone ? 'checked' : ''}> 처리한 것 숨김</label>
+    <span style="margin-left:auto" class="dl"><button class="sm" data-dl="md">Markdown</button><button class="sm" data-dl="docx">DOCX</button><button class="sm" data-dl="txt">TXT</button></span></div>`;
+  const list = iss.filter(i => F.sev[i.sev] && F.src[i.src] && (!F.cat || i.cat === F.cat) && (!F.hideDone || !done.has(i.id))
+    && (!F.q || (i.title + i.why + i.fix + i.quote + i.cat).toLowerCase().includes(F.q.toLowerCase())));
+  const order = {major: 0, minor: 1, info: 2};
+  list.sort((a, b) => (a.src === b.src ? 0 : a.src === 'llm' ? -1 : 1) || order[a.sev] - order[b.sev] || (a.src === 'rule' ? a.pos - b.pos : 0));
+  let lastGroup = '';
+  for (const i of list) {
+    const g = i.src === 'llm' ? (i.sev === 'major' ? '주요 지적 (Major)' : '세부 지적 (Minor)') : '기계적 점검 (규칙)';
+    if (g !== lastGroup) { h += `<h2 class="sec">${g}</h2>`; lastGroup = g; }
+    h += `<div class="issue ${i.sev} ${done.has(i.id) ? 'done' : ''}" id="is-${esc(i.id)}">
+      <div class="hd"><span class="id">${esc(i.id)}</span><span class="sev ${i.sev}">${SEV[i.sev]}</span><span class="tt">${esc(i.title || i.cat)}</span>
+        <span class="tag ${i.src === 'rule' ? 'rule' : ''}">${esc(i.cat)}</span>
+        ${i.where || i.pos ? `<span class="loc" data-pos="${i.pos}" data-len="${i.len}">📍 ${esc(i.where || '원문')}</span>` : ''}
+        ${(i.also || []).map(a => `<span class="loc" data-pos="${a.pos}" data-len="${a.len}">· ${esc(a.where)}</span>`).join('')}
+        ${i.pos2 != null ? `<span class="loc" data-pos="${i.pos2}" data-len="${i.len2}">· 비교 위치</span>` : ''}
+        <label class="ck"><input type="checkbox" data-done="${esc(i.id)}" ${done.has(i.id) ? 'checked' : ''}>처리함</label></div>
+      ${i.quote ? `<blockquote data-pos="${i.pos}" data-len="${i.len}">${esc(i.quote)}</blockquote>` : ''}
+      <p><b>${i.src === 'llm' ? '문제' : '내용'}</b>${esc(i.why)}</p>${i.fix ? `<p><b>수정</b>${esc(i.fix)}</p>` : ''}</div>`;
+  }
+  if (!list.length) h += `<div class="panel empty">조건에 맞는 지적이 없습니다</div>`;
+  if (rv && rv.questions && rv.questions.length) {
+    h += `<h2 class="sec">예상 심사위원 질문</h2><div class="panel"><ol class="qa">${rv.questions.map(q => `<li><b>${stripRefs(q.q)}</b> ${refLinks(q.refs)}${q.tip ? `<div class="tip"><b>준비</b> ${stripRefs(q.tip)}</div>` : ''}</li>`).join('')}</ol></div>`;
+  }
+  $('out').innerHTML = h;
+}
+
+$('out').addEventListener('click', e => {
+  const c = e.target.closest('.chip'); if (c) { F[c.dataset.f][c.dataset.v] = !F[c.dataset.f][c.dataset.v]; return render(); }
+  const l = e.target.closest('[data-pos]'); if (l && !e.target.closest('input')) return view(+l.dataset.pos, +l.dataset.len || 0);
+  const r = e.target.closest('[data-ref]');
+  if (r) { const el = $('is-' + r.dataset.ref); if (el) { el.scrollIntoView({behavior: 'smooth', block: 'center'}); el.style.outline = '2px solid var(--acc)'; setTimeout(() => el.style.outline = '', 1500); } else toast('필터로 숨겨진 지적입니다'); return; }
+  const d = e.target.closest('[data-dl]'); if (d) { location.href = `api/export/${REC.id}.${d.dataset.dl}`; return; }
+  if (e.target.id === 'showdrop') { $('dropbox').hidden = !$('dropbox').hidden; }
+});
+$('out').addEventListener('change', e => {
+  if (e.target.id === 'fcat') { F.cat = e.target.value; render(); }
+  if (e.target.id === 'fdone') { F.hideDone = e.target.checked; render(); }
+  if (e.target.dataset.done) { const s = getDone(); e.target.checked ? s.add(e.target.dataset.done) : s.delete(e.target.dataset.done); setDone(s); render(); }
+});
+$('out').addEventListener('input', e => { if (e.target.id === 'fq') { F.q = e.target.value; const p = e.target.selectionStart; render(); const q = $('fq'); q.focus(); q.setSelectionRange(p, p); } });
+
+// ── 원문 보기: 그 쪽(쪽 정보가 없으면 그 절)을 열고 인용을 칠한다 ──
+let VP = {page: 0};
+function pageRange(p) { const d = REC.doc; return [d.pages[p - 1] || 0, p < d.pages.length ? d.pages[p] : d.text.length]; }
+function view(pos, len) {
+  const d = REC.doc;
+  if (d.npages > 1) { let p = 1; while (p < d.pages.length && d.pages[p] <= pos) p++; VP = {page: p, pos, len}; }
+  else VP = {page: 0, pos, len};
+  drawView(); $('viewer').classList.add('on');
+}
+function drawView() {
+  const d = REC.doc; let a, b, title;
+  if (VP.page) { [a, b] = pageRange(VP.page); title = `${d.name} — ${VP.page} / ${d.npages}쪽`; }
+  else { const s = d.outline.filter(s => s.start <= VP.pos).pop() || {start: 0, end: d.text.length, title: ''}; a = Math.max(0, s.start); b = Math.min(d.text.length, Math.max(s.end, VP.pos + VP.len + 200)); title = `${d.name} — ${s.title || '원문'}`; }
+  const t = d.text, hs = Math.max(a, VP.pos), he = Math.min(b, VP.pos + (VP.len || 0));
+  $('vtitle').textContent = title;
+  $('vtext').innerHTML = VP.len && he > hs ? esc(t.slice(a, hs)) + `<mark class="cur" id="vmark">${esc(t.slice(hs, he))}</mark>` + esc(t.slice(he, b)) : esc(t.slice(a, b));
+  $('vprev').disabled = !VP.page || VP.page <= 1; $('vnext').disabled = !VP.page || VP.page >= d.npages;
+  const m = $('vmark'); if (m) setTimeout(() => m.scrollIntoView({block: 'center'}), 30); else $('vtext').scrollTop = 0;
+}
+$('vclose').onclick = () => $('viewer').classList.remove('on');
+$('vprev').onclick = () => { VP.page--; drawView(); };
+$('vnext').onclick = () => { VP.page++; drawView(); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('viewer').classList.remove('on'); });
+
+// ── 이력 ──
+async function loadHist() {
+  const rows = await (await fetch('api/history')).json();
+  $('hist').innerHTML = rows.map(r => `<li><span class="ts">${esc(r.ts.replace('T', ' ').slice(0, 16))}</span>
+    <span class="t" data-open="${r.id}"><b>${esc(r.title || r.name)}</b><br><span class="hint">${esc(r.name)}</span></span>
+    <span class="vbadge ${vclass(r.verdict)}" style="font-size:12px;padding:1px 8px">${esc(r.verdict || (r.reviewed ? '-' : '점검만'))}</span>
+    <span class="hint">주요 ${r.n.major} · 세부 ${r.n.minor} · 참고 ${r.n.info}</span>
+    <button class="sm" data-del="${r.id}">삭제</button></li>`).join('') || '<li class="hint">아직 이력이 없습니다</li>';
+}
+$('hist').onclick = async e => {
+  const o = e.target.closest('[data-open]'); if (o) { await openRec(o.dataset.open); $('tabs').children[0].click(); return; }
+  const d = e.target.closest('[data-del]');
+  if (d && confirm('이 리뷰 이력을 지울까요? (추출 텍스트와 리뷰가 서버에서 지워집니다)')) {
+    await fetch('api/history/delete', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id: d.dataset.del})});
+    if (REC && REC.id === d.dataset.del) { REC = null; location.hash = ''; }
+    loadHist();
+  }
+};
+async function openRec(id) {
+  const r = await fetch('api/history/' + id); if (!r.ok) return toast('이력을 찾지 못했습니다');
+  setRec(await r.json());
+}
+init();
+</script>
+</body>
+</html>

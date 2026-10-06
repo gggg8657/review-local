@@ -1,0 +1,16 @@
+review-local
+============
+
+Original work (MIT). 표준 라이브러리만 사용하며 제3자 코드·글꼴·데이터를 동봉하지 않습니다.
+- PDF 텍스트 추출은 서버에 설치된 poppler-utils 의 `pdftotext` 를 외부 프로그램으로 호출합니다(동봉하지 않음, GPL).
+- HWP·HWPX 는 같은 저작자의 kordoc-local / notebook-local 에 설치된 kordoc(npm, MIT)을 외부 프로그램으로 호출합니다(동봉하지 않음).
+- DOCX 읽기·쓰기는 zipfile + XML 로 직접 처리합니다(python-docx 불필요).
+LLM 호출 방식·저작자 표기는 같은 저작자의 mail-local 을 따랐습니다.
+
+Files authored for this package (MIT): app.py, manuscript.py, export.py, ui.html, selftest.py, setup.sh, README.md
+
+LLM (not bundled): called via an OpenAI-compatible API; default deployment is Ollama (https://github.com/ollama/ollama, MIT)
+  serving Google Gemma (gemma4:31b, https://ai.google.dev/gemma — see Gemma's terms of use).
+
+This package: Copyright (c) 2026 gggg8657 <dongjukim.dev@gmail.com>
+화면 하단·메타데이터의 저작자 표기는 지우거나 바꾸지 마세요.
