@@ -17,6 +17,6 @@ Files authored for this package (MIT): app.py, manuscript.py, export.py, ui.html
 LLM (not bundled): called via an OpenAI-compatible API; default deployment is Ollama (https://github.com/ollama/ollama, MIT)
   serving Google Gemma 4 (gemma4:31b, Apache-2.0, https://huggingface.co/google/gemma-4-31B-it).
 
-This package: Copyright (c) 2026 DongJu Kim (gggg8657)
+This package: Copyright (c) 2026 DongJu Kim (gggg8657) <dongjukim.dev@gmail.com>
 제3자 구성요소 전체 표·상업 이용 확인 항목: THIRD_PARTY_NOTICES.md
 화면 하단·메타데이터의 저작자 표기는 지우거나 바꾸지 마세요.
