@@ -611,27 +611,37 @@ def review(doc, opt, emit=lambda ev: None, model=None):
 
 
 # ── 이력 (WORKSPACE/history/<id>.json — 원고 하나 = 파일 하나) ────────────
-def hist_path(hid):
+def user_ws(h):
+    """포털이 넘긴 사용자별 작업 폴더. owner(서버 주인)·헤더 없음(단독 실행) = 예전 WORKSPACE 그대로"""
+    u = (h.headers.get("X-Agent-User") or "owner").strip()
+    if u == "owner":
+        return WS
+    d = os.path.join(WS, "u", re.sub(r"[^A-Za-z0-9_.-]", "_", u)[:64] or "_")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def hist_path(hid, base=WS):
     if not re.fullmatch(r"\d{8}-\d{6}-[0-9a-f]{4}", hid or ""):
         raise ValueError("잘못된 이력 id")
-    return os.path.join(WS, "history", hid + ".json")
+    return os.path.join(base, "history", hid + ".json")
 
 
-def hist_load(hid):
-    return json.loads(read(hist_path(hid)))
+def hist_load(hid, base=WS):
+    return json.loads(read(hist_path(hid, base)))
 
 
-def hist_save(rec):
-    os.makedirs(os.path.join(WS, "history"), exist_ok=True)
-    p = hist_path(rec["id"])
+def hist_save(rec, base=WS):
+    os.makedirs(os.path.join(base, "history"), exist_ok=True)
+    p = hist_path(rec["id"], base)
     with LOCK:
         with open(p + ".tmp", "w", encoding="utf-8") as f:
             json.dump(rec, f, ensure_ascii=False)
         os.replace(p + ".tmp", p)
 
 
-def hist_list(limit=200):
-    d = os.path.join(WS, "history")
+def hist_list(limit=200, base=WS):
+    d = os.path.join(base, "history")
     if not os.path.isdir(d):
         return []
     out = []
@@ -649,8 +659,8 @@ def hist_list(limit=200):
     return out
 
 
-def hist_delete(hid):
-    p = hist_path(hid)
+def hist_delete(hid, base=WS):
+    p = hist_path(hid, base)
     if os.path.exists(p):
         os.remove(p)
 
@@ -661,7 +671,7 @@ def client_doc(doc):
         {"outline": M.outline(doc), "nrefs": len(doc["refs"])}
 
 
-def ingest(name, data, opt=None):
+def ingest(name, data, opt=None, base=WS):
     """업로드 → 추출·구조·기계적 점검 → 이력 저장. 원본 파일은 임시 폴더에서 바로 지운다."""
     name = os.path.basename(name or "manuscript.pdf")
     ext = os.path.splitext(name)[1].lower()
@@ -679,12 +689,12 @@ def ingest(name, data, opt=None):
     now = datetime.datetime.now()
     rec = {"id": f"{now:%Y%m%d-%H%M%S}-{secrets.token_hex(2)}", "ts": now.isoformat(timespec="seconds"), "doc": doc,
            "issues": issues, "review": None, "options": opt}
-    hist_save(rec)
+    hist_save(rec, base)
     return rec
 
 
-def run_review(hid, opt, emit):
-    rec = hist_load(hid)
+def run_review(hid, opt, emit, base=WS):
+    rec = hist_load(hid, base)
     opt = {k: opt.get(k) for k in ("journal", "mtype", "depth", "lang", "model") if opt.get(k) is not None}
     if opt.get("mtype") != rec.get("options", {}).get("mtype"):  # 원고 유형이 바뀌면 구조 점검을 다시
         rules = M.mechanical(rec["doc"], opt.get("mtype", ""))
@@ -703,7 +713,7 @@ def run_review(hid, opt, emit):
     rec["issues"] = rules + rv.pop("issues")
     rec["review"] = rv
     rec["options"] = opt
-    hist_save(rec)
+    hist_save(rec, base)
     return rec
 
 
@@ -767,13 +777,13 @@ class H(BaseHTTPRequestHandler):
             if path == "/api/models":
                 return self._send(models())
             if path == "/api/history":
-                return self._send(hist_list())
+                return self._send(hist_list(base=user_ws(self)))
             m = re.fullmatch(r"/api/history/([\w-]+)", path)
             if m:
-                return self._send(client_rec(hist_load(m.group(1))))
+                return self._send(client_rec(hist_load(m.group(1), user_ws(self))))
             m = re.fullmatch(r"/api/export/([\w-]+)\.(md|txt|docx)", path)
             if m:
-                rec = hist_load(m.group(1))
+                rec = hist_load(m.group(1), user_ws(self))
                 base = re.sub(r"[^\w가-힣.-]+", "_", os.path.splitext(rec["doc"]["name"])[0])[:60] + "_review"
                 fn = f"{base}.{m.group(2)}"
                 disp = {"Content-Disposition": f"attachment; filename=\"review.{m.group(2)}\"; filename*=UTF-8''{urllib.request.quote(fn)}"}
@@ -797,13 +807,13 @@ class H(BaseHTTPRequestHandler):
             return self._send({"error": "잘못된 요청"}, code=400)
         try:
             if self.path == "/api/history/delete":
-                hist_delete(req.get("id"))
+                hist_delete(req.get("id"), user_ws(self))
                 return self._send({"ok": True})
             if self.path == "/api/upload":
                 data = base64.b64decode(req.get("data") or "")
                 if not data:
                     raise ValueError("파일이 비어 있습니다")
-                return self._send(client_rec(ingest(req.get("name"), data, {"mtype": req.get("mtype") or ""})))
+                return self._send(client_rec(ingest(req.get("name"), data, {"mtype": req.get("mtype") or ""}, user_ws(self))))
         except (ValueError, RuntimeError) as e:
             return self._send({"error": str(e)}, code=400)
         except Exception as e:
@@ -821,7 +831,7 @@ class H(BaseHTTPRequestHandler):
             self.wfile.flush()
 
         try:
-            emit({"done": client_rec(run_review(req.get("id"), req, emit))})
+            emit({"done": client_rec(run_review(req.get("id"), req, emit, user_ws(self)))})
         except (BrokenPipeError, ConnectionResetError):
             pass
         except Exception as e:
@@ -849,4 +859,4 @@ if __name__ == "__main__":
         print(f"\n[이력 {rec['id']} · 제외된 지적 {len(rec['review']['dropped'])}개 · {rec['review']['elapsed']}초]", file=sys.stderr)
         sys.exit(0)
     print(f"review local → http://localhost:{PORT}  (llm={LLM_API} {LLM_BASE} {MODEL}, workspace={WS})  {_SIG}")
-    ThreadingHTTPServer(("", PORT), H).serve_forever()
+    ThreadingHTTPServer((os.environ.get("BIND", ""), PORT), H).serve_forever()
