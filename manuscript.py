@@ -227,9 +227,9 @@ def find_sections(text):
         if m and not re.match(r"^\s*#+\s*\d+\s*$", line):
             title = m.group(2).strip()
             nm = NUM_HEAD.match(title)
-            hit = (title, len(m.group(1)), _num_key(nm.group(1), None) if nm and nm.group(1) else None, i)
+            hit = (title, len(m.group(1)), _num_key(nm.group(1), None) if nm and nm.group(1) else None, i, True)
         elif UNNUMBERED.match(s) and prev_blank:
-            hit = (s.rstrip(":."), 1, None, i)
+            hit = (s.rstrip(":."), 1, None, i, False)
         else:
             m = NUM_HEAD.match(line)
             mo = NUM_ONLY.match(line) if not m else None
@@ -239,7 +239,7 @@ def find_sections(text):
                     num, rom = mo.group(1), mo.group(2)
                     key = _num_key(num, rom)
                     if (rom and (roman_mode is not False) and (not prev_num or key[0] == prev_num[0] + 1)) or (num and _next_ok(prev_num, key)):
-                        hit = (f"{num or rom} {lines[j].strip()}", len(key), key, i)
+                        hit = (f"{num or rom} {lines[j].strip()}", len(key), key, i, False)
                         if rom:
                             roman_mode = True
                         i = j
@@ -248,15 +248,28 @@ def find_sections(text):
                 if _title_like(title) and not re.match(r"^[\d.,%)]", title):
                     key = _num_key(num or chap, rom)
                     if (rom and roman_mode is not False and (not prev_num or key[0] == prev_num[0] + 1)) or ((num or chap) and _next_ok(prev_num, key)):
-                        hit = (s, len(key), key, i)
+                        hit = (s, len(key), key, i, False)
         if hit:
-            title, level, key, li = hit
+            title, level, key, li, md = hit
             if key:
                 prev_num = key
                 if roman_mode is None and not re.match(r"^[IVXⅠ-Ⅹ]+\.", title):
                     roman_mode = False
-            heads.append({"title": re.sub(r"\s+", " ", title.lstrip("#").strip())[:100], "start": offs[li], "level": level})
+            heads.append({"title": re.sub(r"\s+", " ", title.lstrip("#").strip())[:100], "start": offs[li], "level": level,
+                          "md": md, "num": key})
         i += 1
+    # Markdown 헤딩 수준 맞추기: "# 논문 제목" 하나 + "## 1. 서론"… 꼴이면 제목은 앞부분(front)으로 두고,
+    # 번호 붙은 절은 번호 깊이(1. → 1, 2.1 → 2), 나머지는 가장 얕은 Markdown 수준을 1 로 당긴다.
+    mds = [h for h in heads if h["md"]]
+    if len(mds) > 1 and heads[0] is mds[0] and mds[0]["level"] == 1 and not mds[0]["num"] \
+            and all(h["level"] > 1 for h in mds[1:]) and kind_of(mds[0]["title"]) == "body":
+        heads.pop(0); mds.pop(0)
+    if mds:
+        base = min(h["level"] for h in mds)
+        for h in mds:
+            h["level"] = len(h["num"]) if h["num"] else h["level"] - base + 1
+    for h in heads:
+        del h["md"], h["num"]
     secs = [{"title": "", "kind": "front", "start": 0, "level": 0}] if not heads or heads[0]["start"] > 0 else []
     last_kind = None
     for h in heads:
