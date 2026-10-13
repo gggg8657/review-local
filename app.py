@@ -109,7 +109,7 @@ def llm(system, user, model=None, temperature=0.3, on_token=lambda t: None):
                     continue
                 raise RuntimeError(f"LLM HTTP {e.code}: {msg[:300]}")
     except urllib.error.URLError as e:
-        raise RuntimeError(f"LLM 서버 연결 실패 ({LLM_BASE}): {e.reason}")
+        raise RuntimeError(f"LLM 서버 연결 실패: {e.reason}")  # 내부 주소는 응답에 넣지 않음
 
 
 def models():
@@ -726,7 +726,7 @@ def client_rec(rec):
 
 def meta():
     return {"mtypes": MTYPES, "depths": [{"id": k, "label": v[0]} for k, v in DEPTHS.items()], "langs": [{"id": k, "label": v} for k, v in LANGS.items()],
-            "model": MODEL, "llm": f"{LLM_API} {LLM_BASE}", "tools": M.tools_status()}
+            "model": MODEL, "tools": M.tools_status()}  # LLM 서버 주소는 내보내지 않음
 
 
 # ── HTTP ───────────────────────────────────────────────────────────────
@@ -800,6 +800,9 @@ class H(BaseHTTPRequestHandler):
     def do_POST(self):
         n = int(self.headers.get("Content-Length") or 0)
         if n > MAX_UPLOAD * 1.4:
+            self.close_connection = True
+            while n > 0 and self.rfile.read(min(n, 1 << 20)):  # 본문을 버려 읽어야 포털(프록시)이 502 대신 413 을 받는다
+                n -= 1 << 20
             return self._send({"error": f"파일이 너무 큽니다 (최대 {MAX_UPLOAD // 1024 // 1024}MB)"}, code=413)
         try:
             req = json.loads(self.rfile.read(n) or b"{}")

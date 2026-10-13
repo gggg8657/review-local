@@ -179,7 +179,7 @@ async function init() {
   seg('lang', META.langs, 'lang');
   $('journal').value = opts.journal || '';
   $('journal').oninput = () => { opts.journal = $('journal').value; saveOpts(); };
-  $('modelinfo').textContent = `${META.model} · ${META.llm}` + (META.tools.pdftotext ? '' : ' · ⚠ pdftotext 없음') + (META.tools.kordoc ? '' : ' · HWP 미지원(kordoc 없음)');
+  $('modelinfo').textContent = `${META.model}` + (META.tools.pdftotext ? '' : ' · ⚠ pdftotext 없음') + (META.tools.kordoc ? '' : ' · HWP 미지원(kordoc 없음)');
   const ms = await (await fetch('api/models')).json().catch(() => []);
   const all = [...new Set([META.model, ...ms])];
   $('model').innerHTML = all.map(m => `<option ${m === META.model ? 'selected' : ''}>${esc(m)}</option>`).join('');
