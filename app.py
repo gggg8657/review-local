@@ -22,6 +22,7 @@ import time
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import portal_auth  # 포털 서명 확인 관문·오류 문장 정리(원본 agent-page-portal/sdk/portal_auth.py)
 
 import export
 import manuscript as M
@@ -797,11 +798,13 @@ class H(BaseHTTPRequestHandler):
                     return self._send(export.to_docx(rec), "application/vnd.openxmlformats-officedocument.wordprocessingml.document", extra=disp)
                 body = export.to_md(rec) if m.group(2) == "md" else export.to_txt(rec)
                 return self._send(body.encode(), ("text/markdown" if m.group(2) == "md" else "text/plain") + "; charset=utf-8", extra=disp)
+            if self.path.split("?")[0].startswith("/api/"):   # 없는 API 경로는 화면 대신 JSON 404
+                return self._send({"error": "not found"}, code=404)
             self._send(signed(HTML).encode(), "text/html; charset=utf-8")
         except (FileNotFoundError, ValueError):
             self._send({"error": "없음"}, code=404)
         except Exception as e:
-            self._send({"error": f"{type(e).__name__}: {e}"}, code=500)
+            self._send({"error": portal_auth.scrub(f"{type(e).__name__}: {e}")}, code=500)
 
     def do_POST(self):
         n = int(self.headers.get("Content-Length") or 0)
@@ -826,7 +829,7 @@ class H(BaseHTTPRequestHandler):
         except (ValueError, RuntimeError) as e:
             return self._send({"error": str(e)}, code=400)
         except Exception as e:
-            return self._send({"error": f"{type(e).__name__}: {e}"}, code=500)
+            return self._send({"error": portal_auth.scrub(f"{type(e).__name__}: {e}")}, code=500)
         if self.path != "/api/run":
             return self._send({"error": "없는 경로"}, code=404)
         self.send_response(200)
@@ -888,4 +891,4 @@ if __name__ == "__main__":
         print(f"\n[이력 {rec['id']} · 제외된 지적 {len(rec['review']['dropped'])}개 · {rec['review']['elapsed']}초]", file=sys.stderr)
         sys.exit(0)
     print(f"review local → http://localhost:{PORT}  (llm={LLM_API} {LLM_BASE} {MODEL}, workspace={WS})  {_SIG}")
-    ThreadingHTTPServer((os.environ.get("BIND", "127.0.0.1"), PORT), __import__("portal_auth").install(H, "review-local")).serve_forever()
+    ThreadingHTTPServer((os.environ.get("BIND", "127.0.0.1"), PORT), portal_auth.install(H, "review-local")).serve_forever()
