@@ -25,6 +25,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import export
 import manuscript as M
+import portal_jobs
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 WS = os.environ.get("WORKSPACE") or os.path.join(ROOT, "_workspace")  # 포털이 AGENT_DATA/<도구> 로 모아 줌
@@ -621,6 +622,11 @@ def user_ws(h):
     return d
 
 
+def job(h, status, hid, title, message=""):
+    """포털 작업 알림(🔔) — 포털 밖에서 띄웠으면 아무 일도 안 함. link = 이 도구 화면에서 그 이력을 여는 주소(#<id>)"""
+    portal_jobs.notify((h.headers.get("X-Agent-User") or "owner").strip() or "owner", status, id=hid, title=title, link="/#" + hid, message=message)
+
+
 def hist_path(hid, base=WS):
     if not re.fullmatch(r"\d{8}-\d{6}-[0-9a-f]{4}", hid or ""):
         raise ValueError("잘못된 이력 id")
@@ -833,11 +839,31 @@ class H(BaseHTTPRequestHandler):
             self.wfile.write(f"data: {json.dumps(ev, ensure_ascii=False)}\n\n".encode())
             self.wfile.flush()
 
+        hid, title, st = req.get("id"), None, {"q": False}
         try:
-            emit({"done": client_rec(run_review(req.get("id"), req, emit, user_ws(self)))})
+            title = "논문 리뷰 — " + str(hist_load(hid, user_ws(self))["doc"]["name"])[:60]
+            job(self, "running", hid, title)
+        except Exception:
+            pass  # 없는 이력이면 아래 run_review 가 오류를 보냄
+
+        def emit_job(ev):  # LLM 순서 대기 → queued, 대기 끝나고 다음 단계 → running
+            if title and ev.get("stage") == "wait":
+                st["q"] = True; job(self, "queued", hid, title, "다른 리뷰가 끝나기를 기다리는 중")
+            elif title and st["q"] and ev.get("stage"):
+                st["q"] = False; job(self, "running", hid, title)
+            emit(ev)
+
+        try:
+            rec = run_review(hid, req, emit_job, user_ws(self))
+            if title:
+                rv = rec.get("review") or {}
+                job(self, "done", hid, title, f"{(rv.get('verdict') or {}).get('label') or '판정 없음'} · 지적 {len(rec.get('issues') or [])}개")
+                title = None
+            emit({"done": client_rec(rec)})
         except (BrokenPipeError, ConnectionResetError):
-            pass
+            title and job(self, "failed", hid, title, "화면 연결이 끊겨 중단됨")
         except Exception as e:
+            title and job(self, "failed", hid, title, str(e)[:100] if isinstance(e, ValueError) else type(e).__name__)
             try:
                 emit({"error": str(e) if isinstance(e, (ValueError, RuntimeError, FileNotFoundError)) else f"{type(e).__name__}: {e}"})
             except OSError:
