@@ -757,6 +757,24 @@ def signed(html):
     return html
 
 
+def safe_emit(wfile):
+    """SSE 한 줄 쓰기. 브라우저가 떠나 연결이 끊기면(포털도 도구 쪽 연결을 닫음) 그 뒤 쓰기는 조용히 버린다 —
+    끊김은 취소가 아니라서 리뷰는 끝까지 하고 결과는 이력에 남고 🔔 알림은 완료로 간다"""
+    gone = []
+
+    def emit(ev):
+        if gone:
+            return
+        b = f"data: {json.dumps(ev, ensure_ascii=False)}\n\n".encode()
+        try:
+            wfile.write(b)
+            wfile.flush()
+        except OSError:  # BrokenPipe·ConnectionReset·ConnectionAborted·닫힌 소켓
+            gone.append(1)
+            print("클라이언트 연결 끊김 — 작업은 계속", file=sys.stderr, flush=True)
+    return emit
+
+
 class H(BaseHTTPRequestHandler):
     def log_message(self, fmt, *a):
         if "/api/run" in (a[0] if a else "") or "/api/upload" in (a[0] if a else ""):
@@ -837,11 +855,7 @@ class H(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
         self.send_header("Cache-Control", "no-cache")
         self.end_headers()
-
-        def emit(ev):
-            self.wfile.write(f"data: {json.dumps(ev, ensure_ascii=False)}\n\n".encode())
-            self.wfile.flush()
-
+        emit = safe_emit(self.wfile)
         hid, title, st = req.get("id"), None, {"q": False}
         try:
             title = "논문 리뷰 — " + str(hist_load(hid, user_ws(self))["doc"]["name"])[:60]
@@ -863,14 +877,9 @@ class H(BaseHTTPRequestHandler):
                 job(self, "done", hid, title, f"{(rv.get('verdict') or {}).get('label') or '판정 없음'} · 지적 {len(rec.get('issues') or [])}개")
                 title = None
             emit({"done": client_rec(rec)})
-        except (BrokenPipeError, ConnectionResetError):
-            title and job(self, "failed", hid, title, "화면 연결이 끊겨 중단됨")
         except Exception as e:
             title and job(self, "failed", hid, title, str(e)[:100] if isinstance(e, ValueError) else type(e).__name__)
-            try:
-                emit({"error": str(e) if isinstance(e, (ValueError, RuntimeError, FileNotFoundError)) else f"{type(e).__name__}: {e}"})
-            except OSError:
-                pass
+            emit({"error": str(e) if isinstance(e, (ValueError, RuntimeError, FileNotFoundError)) else f"{type(e).__name__}: {e}"})
 
 
 if __name__ == "__main__":

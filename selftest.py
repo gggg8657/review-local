@@ -280,6 +280,33 @@ try:
         raise AssertionError("잘못된 이력 id 가 통과함")
     except urllib.error.HTTPError as e:
         assert e.code == 404
+    # 9-1) 브라우저가 떠나도(첫 이벤트 뒤 쓰기가 BrokenPipeError) 리뷰는 끝까지 — 이력에 남고 🔔 done, 서버 오류·트레이스백 없음
+    class Cut:
+        def __init__(s, f, n): s.f, s.n = f, n
+        def write(s, b):
+            s.n -= 1
+            if s.n < 0: raise BrokenPipeError(32, "Broken pipe")
+            return s.f.write(b)
+        def flush(s): pass
+        def __getattr__(s, k): return getattr(s.f, k)
+    class CutH(app.H):
+        def setup(s): super().setup(); s.wfile = Cut(s.wfile, 2)  # 응답 머리 + 첫 이벤트까지만 닿음
+    ERRS, JOBS = [], []
+    class Srv(app.ThreadingHTTPServer):
+        def handle_error(s, rq, addr): ERRS.append(sys.exc_info()[1])
+    cut = Srv(("127.0.0.1", 0), CutH); threading.Thread(target=cut.serve_forever, daemon=True).start()
+    up2 = json.load(post("/api/upload", {"name": "ko2.docx", "data": base64.b64encode(KO).decode(), "mtype": "연구논문"}))
+    _job, app.job = app.job, lambda h, st, hid, title, msg="": JOBS.append(st)
+    err0, sys.stderr = sys.stderr, io.StringIO(); cap = sys.stderr
+    try:
+        got = urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:{cut.server_address[1]}/api/run",
+                                                            json.dumps({"id": up2["id"], "depth": "quick", "lang": "auto"}).encode())).read().decode()
+    finally:
+        sys.stderr, app.job = err0, _job
+    cut.shutdown()
+    assert got.count("data: ") == 1 and (app.hist_load(up2["id"])["review"] or {}).get("verdict", {}).get("label") == "Major Revision", got
+    assert JOBS[0] == "running" and JOBS[-1] == "done" and "failed" not in JOBS, JOBS
+    assert not ERRS and "Traceback" not in cap.getvalue() and cap.getvalue().count("연결 끊김") == 1, (ERRS, cap.getvalue())
     srv.shutdown()
     assert all(fn.endswith(".json") for fn in os.listdir(os.path.join(TMP, "history")))   # 원본 파일은 남기지 않음
 
